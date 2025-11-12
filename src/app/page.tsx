@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Check, Droplets, Flame, Target, TrendingDown, Zap, Shield, CreditCard } from "lucide-react";
+import { Check, Droplets, Flame, Target, TrendingDown, Zap, Shield, CreditCard, Copy, Mail } from "lucide-react";
+import { PAYMENT_CONFIG, generatePixPayment } from "@/lib/payment";
 
-type Step = "welcome" | "quiz" | "results" | "payment";
+type Step = "welcome" | "quiz" | "results" | "payment" | "pix";
 
 interface QuizData {
   hasAccount: string;
@@ -19,11 +20,14 @@ interface QuizData {
   height: string;
   goal: string;
   activityLevel: string;
+  email: string;
 }
 
 export default function Home() {
   const [step, setStep] = useState<Step>("welcome");
   const [quizStep, setQuizStep] = useState(1);
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual' | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
   const [quizData, setQuizData] = useState<QuizData>({
     hasAccount: "",
     gender: "",
@@ -32,9 +36,10 @@ export default function Home() {
     height: "",
     goal: "",
     activityLevel: "",
+    email: "",
   });
 
-  const totalQuizSteps = 7;
+  const totalQuizSteps = 8; // Adicionado passo do email
   const progress = (quizStep / totalQuizSteps) * 100;
 
   // Cálculos de macros baseados nos dados do usuário
@@ -97,6 +102,17 @@ export default function Home() {
     if (quizStep > 1) {
       setQuizStep(quizStep - 1);
     }
+  };
+
+  const handlePlanSelection = (plan: 'monthly' | 'annual') => {
+    setSelectedPlan(plan);
+    setStep("pix");
+  };
+
+  const copyPixKey = () => {
+    navigator.clipboard.writeText(PAYMENT_CONFIG.sellerEmail);
+    setPixCopied(true);
+    setTimeout(() => setPixCopied(false), 2000);
   };
 
   // Tela de Boas-vindas
@@ -301,6 +317,23 @@ export default function Home() {
               </div>
             )}
 
+            {quizStep === 8 && (
+              <div className="space-y-4">
+                <Label htmlFor="email" className="text-xl font-semibold text-gray-800">Qual é o seu melhor email?</Label>
+                <Input 
+                  id="email"
+                  type="email" 
+                  placeholder="seu@email.com"
+                  value={quizData.email}
+                  onChange={(e) => setQuizData({...quizData, email: e.target.value})}
+                  className="text-lg p-6 border-2 focus:border-emerald-400"
+                />
+                <p className="text-sm text-gray-600">
+                  Enviaremos seu plano personalizado e acesso ao app
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               {quizStep > 1 && (
                 <Button 
@@ -321,7 +354,8 @@ export default function Home() {
                   (quizStep === 4 && !quizData.weight) ||
                   (quizStep === 5 && !quizData.height) ||
                   (quizStep === 6 && !quizData.goal) ||
-                  (quizStep === 7 && !quizData.activityLevel)
+                  (quizStep === 7 && !quizData.activityLevel) ||
+                  (quizStep === 8 && !quizData.email)
                 }
               >
                 {quizStep === totalQuizSteps ? "Ver Meus Resultados" : "Próximo"}
@@ -506,7 +540,7 @@ export default function Home() {
 
                 <Button 
                   className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-6 text-lg rounded-xl"
-                  onClick={() => alert('Processamento de pagamento será integrado. Email: pana74269@gmail.com')}
+                  onClick={() => handlePlanSelection('monthly')}
                 >
                   <CreditCard className="w-5 h-5 mr-2" />
                   Assinar Agora
@@ -562,7 +596,7 @@ export default function Home() {
 
                 <Button 
                   className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-6 text-lg rounded-xl shadow-xl"
-                  onClick={() => alert('Processamento de pagamento será integrado. Email: pana74269@gmail.com')}
+                  onClick={() => handlePlanSelection('annual')}
                 >
                   <CreditCard className="w-5 h-5 mr-2" />
                   Garantir Oferta Especial
@@ -590,9 +624,133 @@ export default function Home() {
 
           {/* Informações de Pagamento */}
           <div className="text-center text-sm text-gray-500 space-y-2">
-            <p>🔒 Pagamento 100% seguro e criptografado</p>
+            <p>🔒 Pagamento 100% seguro via PIX</p>
             <p>📧 Dúvidas? Entre em contato: pana74269@gmail.com</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Tela PIX
+  if (step === "pix" && selectedPlan) {
+    const pixData = generatePixPayment(selectedPlan);
+    const planData = PAYMENT_CONFIG.plans[selectedPlan];
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4 py-12">
+        <div className="max-w-2xl mx-auto space-y-8">
+          <div className="text-center space-y-4">
+            <div className="inline-block p-4 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-3xl shadow-2xl mb-4">
+              <CreditCard className="w-12 h-12 text-white" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+              Finalize Seu Pagamento
+            </h1>
+            <p className="text-xl text-gray-600">
+              {planData.name} - R$ {planData.price.toFixed(2)}
+            </p>
+          </div>
+
+          <Card className="border-2 border-emerald-200 shadow-2xl">
+            <CardHeader className="bg-gradient-to-br from-emerald-50 to-teal-50">
+              <CardTitle className="text-2xl text-center flex items-center justify-center gap-3">
+                <CreditCard className="w-8 h-8 text-emerald-600" />
+                Pagamento via PIX
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="bg-white p-6 rounded-xl border-2 border-emerald-200">
+                <p className="text-center text-gray-700 mb-4 font-semibold">
+                  Escaneie o QR Code ou copie a chave PIX:
+                </p>
+                
+                <div className="bg-gray-100 p-4 rounded-lg mb-4">
+                  <p className="text-center text-sm text-gray-600 mb-2">Chave PIX (Email):</p>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      value={pixData.pixKey}
+                      readOnly
+                      className="text-center font-mono text-sm"
+                    />
+                    <Button
+                      onClick={copyPixKey}
+                      variant="outline"
+                      size="icon"
+                      className="flex-shrink-0"
+                    >
+                      {pixCopied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  {pixCopied && (
+                    <p className="text-center text-sm text-green-600 mt-2">
+                      ✓ Chave PIX copiada!
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3 text-sm text-gray-600">
+                  <div className="flex justify-between">
+                    <span>Valor:</span>
+                    <span className="font-bold text-emerald-600">R$ {pixData.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Destinatário:</span>
+                    <span className="font-semibold">{pixData.pixKey}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Descrição:</span>
+                    <span>{pixData.description}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                  <Mail className="w-5 h-5" />
+                  Após o pagamento:
+                </h4>
+                <ol className="text-sm text-blue-800 space-y-2 ml-6 list-decimal">
+                  <li>Envie o comprovante para: <strong>pana74269@gmail.com</strong></li>
+                  <li>Inclua seu email cadastrado: <strong>{quizData.email}</strong></li>
+                  <li>Você receberá acesso em até 24 horas</li>
+                </ol>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={() => setStep("payment")}
+                  variant="outline"
+                  className="flex-1 py-6"
+                >
+                  Voltar
+                </Button>
+                <Button
+                  onClick={() => window.location.href = `mailto:pana74269@gmail.com?subject=Comprovante de Pagamento - ${planData.name}&body=Olá! Segue meu comprovante de pagamento.%0A%0AEmail cadastrado: ${quizData.email}%0APlano: ${planData.name}%0AValor: R$ ${planData.price.toFixed(2)}`}
+                  className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white py-6"
+                >
+                  <Mail className="w-5 h-5 mr-2" />
+                  Enviar Comprovante
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <Shield className="w-12 h-12 text-green-500 flex-shrink-0" />
+                <div>
+                  <h3 className="font-bold text-gray-800 mb-1">
+                    Garantia de 7 Dias
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Não gostou? Devolvemos 100% do seu dinheiro, sem perguntas!
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
